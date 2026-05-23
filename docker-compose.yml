@@ -1,0 +1,8 @@
+services:
+  tahoma-service:
+    container_name: tahoma-service
+    build: .
+    ports:
+      - "${AWNING_PORT:-8765}:8765"
+    env_file: .env
+    restart: unless-stopped
