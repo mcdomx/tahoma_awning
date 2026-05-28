@@ -47,16 +47,52 @@ All endpoints use `GET` and return `{"status": "ok"}` on success or a `500` with
 | `GET /health` | Service health check |
 | `GET /awning/deploy` | Extend the awning fully |
 | `GET /awning/undeploy` | Retract the awning fully |
+| `GET /awning/deploy/timed?seconds=N` | Extend for N seconds, then stop |
+| `GET /awning/undeploy/timed?seconds=N` | Retract for N seconds, then stop |
 | `GET /awning/stop` | Stop movement immediately |
 | `GET /awning/my` | Move to the preset "my" position |
 | `GET /awning/devices` | List all devices registered to the gateway |
+
+The `seconds` parameter on the timed endpoints is required and must be greater than 0. The request blocks until the stop command has been sent, so response time is approximately `seconds` plus two gateway round trips.
 
 Example:
 
 ```bash
 curl http://localhost:8765/awning/deploy
+curl http://localhost:8765/awning/deploy/timed?seconds=5
 curl http://localhost:8765/awning/stop
 curl http://localhost:8765/awning/undeploy
+curl http://localhost:8765/awning/undeploy/timed?seconds=5
+```
+
+## Python Client
+
+```python
+import requests
+
+BASE = "http://localhost:8765"
+
+# Health check
+requests.get(f"{BASE}/health").json()
+
+# Full deploy / undeploy
+requests.get(f"{BASE}/awning/deploy")
+requests.get(f"{BASE}/awning/undeploy")
+
+# Timed deploy / undeploy (blocks until stop is sent)
+requests.get(f"{BASE}/awning/deploy/timed", params={"seconds": 5}, timeout=30)
+requests.get(f"{BASE}/awning/undeploy/timed", params={"seconds": 5}, timeout=30)
+
+# Stop immediately
+requests.get(f"{BASE}/awning/stop")
+
+# Move to preset "my" position
+requests.get(f"{BASE}/awning/my")
+
+# List all gateway devices
+devices = requests.get(f"{BASE}/awning/devices").json()
+for d in devices:
+    print(d["label"], d["url"], d["type"])
 ```
 
 ## How It Works

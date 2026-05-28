@@ -1,11 +1,13 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 
 from app.commands import (
     deploy_awning,
+    deploy_for_seconds,
     get_devices,
     my_position,
     stop_awning,
     undeploy_awning,
+    undeploy_for_seconds,
 )
 
 app = FastAPI(title="Tahoma Awning API")
@@ -30,6 +32,24 @@ async def undeploy() -> dict:
     try:
         await undeploy_awning()
         return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/awning/deploy/timed")
+async def deploy_timed(seconds: float = Query(..., gt=0, description="Seconds to deploy before stopping")) -> dict:
+    try:
+        await deploy_for_seconds(seconds)
+        return {"status": "ok", "seconds": seconds}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/awning/undeploy/timed")
+async def undeploy_timed(seconds: float = Query(..., gt=0, description="Seconds to retract before stopping")) -> dict:
+    try:
+        await undeploy_for_seconds(seconds)
+        return {"status": "ok", "seconds": seconds}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
