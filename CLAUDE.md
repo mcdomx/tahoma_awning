@@ -54,4 +54,11 @@ TAHOMA_PIN     # TaHoma gateway PIN (kept for reference)
 TAHOMA_KEY     # Local API token
 TAHOMA_HOST    # Gateway IP address (e.g. 192.168.1.x) — used instead of mDNS
 AWNING_PORT    # Host port exposed by docker-compose (default: 8765)
+CICD_DEPLOY_MODE       # docker (this project runs entirely in Docker)
+CICD_GIT_BRANCH        # branch the Pi polls for new commits (default: main)
+CICD_INTERVAL_MINUTES  # minimum minutes between deploy attempts (default: 15)
 ```
+
+## CI/CD (Pi auto-deploy)
+
+`scripts/cicd_update.py`, run every minute via cron on the Pi, polls `origin/<CICD_GIT_BRANCH>` and on new commits runs `git pull` + `docker compose pull && up -d`. See `README-PI.md` for full Pi setup, cron entry, and pause/resume (`touch .cicd_disabled`).
