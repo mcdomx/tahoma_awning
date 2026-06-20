@@ -5,3 +5,5 @@ __pycache__/
 .ipynb_checkpoints/
 *.ipynb
 Pipfile.lock
+logs/
+.cicd_disabled
