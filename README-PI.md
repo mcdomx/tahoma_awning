@@ -84,21 +84,50 @@ See `CLAUDE.md` (or `README.md`) for the full list of supported env vars. At min
 CICD_DEPLOY_MODE=docker
 CICD_GIT_BRANCH=main
 CICD_INTERVAL_MINUTES=15
+CICD_COMPOSE_FILE=docker-compose.pi.yml
 ```
 
 ---
 
-## 6. Install Dependencies and Start the Service
+## 6. Enable I2C for the LCD Display (optional)
+
+Skip this step if you aren't wiring up the status LCD. See `README-LCD.md` for
+wiring and the full feature description.
 
 ```bash
-docker compose up -d --build
+sudo raspi-config        # Interface Options -> I2C -> Enable
+sudo reboot
 ```
 
-This builds the image and starts the `tahoma-service` container with `restart: unless-stopped`, so it comes back up automatically after a reboot or crash.
+(Equivalent: ensure `dtparam=i2c_arm=on` in `/boot/firmware/config.txt`.)
+
+After reboot, install `i2c-tools` and confirm the LCD is detected:
+
+```bash
+sudo apt install -y i2c-tools
+i2cdetect -y 1
+```
+
+You should see the device at `27` (the default) or `3f`. If it shows `3f`, set
+`LCD_I2C_ADDRESS=0x3f` in `.env`.
 
 ---
 
-## 7. Set Up CI/CD (Auto-Deploy on New Commits)
+## 7. Install Dependencies and Start the Service
+
+```bash
+docker compose -f docker-compose.pi.yml up -d --build
+```
+
+`docker-compose.pi.yml` is the same service as `docker-compose.yml` plus
+`/dev/i2c-1` device passthrough for the LCD. If you skipped step 6, this still
+works — the app detects the missing display and runs without it. This starts
+the `tahoma-service` container with `restart: unless-stopped`, so it comes
+back up automatically after a reboot or crash.
+
+---
+
+## 8. Set Up CI/CD (Auto-Deploy on New Commits)
 
 Add a cron entry that polls `origin/main` every minute and redeploys when new commits land:
 
@@ -129,10 +158,10 @@ rm .cicd_disabled      # resume
 
 ---
 
-## 8. Verify
+## 9. Verify
 
 ```bash
-docker compose ps
+docker compose -f docker-compose.pi.yml ps
 curl http://localhost:8765/health
 tail -f logs/cicd.log
 ```
@@ -155,3 +184,5 @@ PATH=/home/mcdomx/.local/bin:/usr/local/bin:/usr/bin:/bin
 **docker: permission denied** — Usually means the user wasn't added to the `docker` group, or the group change hasn't taken effect in the current shell. Log out/in (or reboot) and retry `docker compose ps`.
 
 **No new commits detected** — `scripts/cicd_update.py` compares `HEAD` against `origin/<branch>` via `git fetch`. If the Pi's clone is on a different branch than `CICD_GIT_BRANCH`, it will never see updates. Check with `git branch --show-current`.
+
+**LCD powered on but blank** — `i2cdetect` not found usually means step 6 was skipped; run `sudo apt install -y i2c-tools` and retry `i2cdetect -y 1`. If the device shows up but the screen is still blank, it's almost always the contrast potentiometer on the backpack — turn it with a small screwdriver while powered on. See `README-LCD.md` for the full LCD troubleshooting list.
