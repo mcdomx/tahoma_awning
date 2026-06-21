@@ -10,7 +10,7 @@ import time
 from typing import Optional
 
 _lock = threading.Lock()
-_last_movement: str = "UNKNOWN"  # e.g. "FULLY DEPLOYED", "DEPLOYED 2s"; stop is not a movement
+_last_movement: str = "INITIAL STATE"  # e.g. "FULLY DEPLOYED", "DEPLOYED 2s"; stop is not a movement
 _action: str = "IDLE"  # IDLE, DEPLOYING, RETRACTING
 _action_started_at: Optional[float] = None
 _action_total_seconds: Optional[float] = None  # None when duration is unknown

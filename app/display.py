@@ -75,25 +75,29 @@ def _init_lcd():
         auto_linebreaks=False,
     )
     lcd.clear()
+    lcd.text_align_mode = "left"
     return lcd
 
 
-def _display_thread(lcd) -> None:
+def _write_lines(lcd, lines: Tuple[str, str]) -> None:
+    lcd.cursor_pos = (0, 0)
+    lcd.write_string(lines[0])
+    lcd.cursor_pos = (1, 0)
+    lcd.write_string(lines[1])
+
+
+def _display_thread(lcd, prev: Tuple[str, str]) -> None:
     interval = _env_int("LCD_UPDATE_SECONDS", 1)
-    prev = None
     while True:
+        time.sleep(interval)
         lines = format_lines(get_status())
         if lines != prev:
             try:
-                lcd.cursor_pos = (0, 0)
-                lcd.write_string(lines[0])
-                lcd.cursor_pos = (1, 0)
-                lcd.write_string(lines[1])
+                _write_lines(lcd, lines)
                 prev = lines
             except Exception:
                 logger.exception("LCD write failed; disabling display")
                 return
-        time.sleep(interval)
 
 
 def start_display() -> None:
@@ -120,7 +124,14 @@ def start_display() -> None:
         logger.info("LCD not detected on I2C bus; running without display")
         return
 
+    initial_lines = format_lines(get_status())
+    try:
+        _write_lines(lcd, initial_lines)
+    except Exception:
+        logger.exception("LCD write failed; disabling display")
+        return
+
     _started.set()
-    t = threading.Thread(target=_display_thread, args=(lcd,), daemon=True, name="lcd-display")
+    t = threading.Thread(target=_display_thread, args=(lcd, initial_lines), daemon=True, name="lcd-display")
     t.start()
     logger.info("LCD display started")
