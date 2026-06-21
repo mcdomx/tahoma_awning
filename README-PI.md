@@ -135,13 +135,18 @@ Add a cron entry that polls `origin/main` every minute and redeploys when new co
 crontab -e
 ```
 
-Add this line:
+Add these lines:
 
 ```
 * * * * * ENVIRONMENT=production /usr/bin/python3 /home/mcdomx/tahoma_awning/scripts/cicd_update.py
+@reboot /home/mcdomx/tahoma_awning/scripts/run_cicd_boot.sh
 ```
 
-This fires every minute but gates on `CICD_INTERVAL_MINUTES` (default: 15). Logs go to `logs/cicd.log`.
+The first line fires every minute but gates on `CICD_INTERVAL_MINUTES` (default: 15) and rebuilds the container (`docker compose up -d --build`) whenever new commits are found — `up -d` alone wouldn't pick up code changes since the image is built locally, not pulled from a registry.
+
+The `@reboot` line runs once after a reboot (waiting for Docker to be ready first), bypassing the interval throttle so any commits that landed while the Pi was off are picked up and rebuilt immediately, rather than waiting up to `CICD_INTERVAL_MINUTES`. It still only rebuilds if `origin/<branch>` is ahead of `HEAD`.
+
+Logs go to `logs/cicd.log`.
 
 **Pause / resume without editing cron:**
 

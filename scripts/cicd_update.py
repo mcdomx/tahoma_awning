@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """CI/CD polling script — generic, config-driven via .env. See README-PI.md."""
 
+import argparse
 import logging
 import os
 import shutil
@@ -125,9 +126,10 @@ def deploy_docker() -> None:
     docker_bin = shutil.which("docker")
     if not docker_bin:
         raise RuntimeError("docker not found on PATH")
-    _run([docker_bin, "compose", "-f", compose_file, "pull"], cwd=PROJECT_ROOT)
-    out = _run([docker_bin, "compose", "-f", compose_file, "up", "-d"], cwd=PROJECT_ROOT)
-    logger.info("docker compose up -d: %s", out or "ok")
+    # The image is built locally from the Dockerfile (no registry to `pull`
+    # from), so the container only picks up new commits if rebuilt here.
+    out = _run([docker_bin, "compose", "-f", compose_file, "up", "-d", "--build"], cwd=PROJECT_ROOT)
+    logger.info("docker compose up -d --build: %s", out or "ok")
 
 
 def deploy() -> None:
@@ -142,8 +144,19 @@ def deploy() -> None:
 
 # ── Entry point ────────────────────────────────────────────────────────────
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--ignore-interval",
+        action="store_true",
+        help="Skip the CICD_INTERVAL_MINUTES throttle (used by the @reboot cron entry)",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
     setup_logging()
+    args = parse_args()
 
     env = os.environ.get("ENVIRONMENT", "development")
     if env != "production":
@@ -155,7 +168,7 @@ def main() -> None:
         sys.exit(0)
 
     interval = load_interval()
-    if is_too_soon(interval):
+    if not args.ignore_interval and is_too_soon(interval):
         sys.exit(0)  # silent — most cron fires hit this path
     record_run_time()
     logger.info("--- CI/CD poll starting (interval: %d min) ---", interval)
