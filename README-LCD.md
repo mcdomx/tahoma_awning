@@ -13,7 +13,7 @@ API normally. You can wire it up at any time.
 A fixed 16x2 layout, refreshing every second:
 
 ```
-STATUS: DEPLOYED     <- last known position: DEPLOYED / RETRACTED / STOPPED / UNKNOWN
+FULLY DEPLOYED       <- last movement command executed
 DEPLOYING 12S        <- current action: IDLE, DEPLOYING <n>S, or RETRACTING <n>S
 ```
 
@@ -22,9 +22,11 @@ the gateway (or this service) where the awning physically is. So both lines
 are tracked optimistically from the commands this service has sent, not read
 from hardware:
 
-- **Status** (line 1) is set when an action completes: a full `deploy` →
-  `DEPLOYED`, a full `undeploy` → `RETRACTED`, any `stop`/`my`/timed move →
-  `STOPPED`. Before any command has been sent this boot, it reads `UNKNOWN`.
+- **Last movement** (line 1) is set when a movement completes: a full
+  `deploy` → `FULLY DEPLOYED`, a full `undeploy` → `FULLY RETRACTED`, a timed
+  `deploy`/`undeploy` → `DEPLOYED <n>s` / `RETRACTED <n>s`. `stop` and `my` are
+  not movements, so they leave this line unchanged. Before any command has
+  been sent this boot, it reads `INITIAL STATE`.
 - **Action** (line 2) shows `IDLE` when nothing is moving. For a timed
   `/awning/deploy/timed` or `/awning/undeploy/timed` call, the countdown
   counts down the requested seconds. For a full (non-timed) `/awning/deploy`
@@ -124,7 +126,7 @@ Set `LCD_ENABLED=false` to force it off even when an LCD is attached.
 - **Container can't open `/dev/i2c-1`** — confirm you deployed with
   `docker-compose.pi.yml` (not the plain `docker-compose.yml`), and that
   `/dev/i2c-1` exists on the host (`ls /dev/i2c-1`).
-- **Status/action never change from `UNKNOWN`/`IDLE`** — the LCD only reflects
+- **Last movement/action never change from `INITIAL STATE`/`IDLE`** — the LCD only reflects
   commands sent through this service; it has no way to see manual remote
   control of the awning.
 - **Confirm graceful operation** — unplug the LCD and restart the service; the
