@@ -1,3 +1,6 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Query
 
 from app.commands import (
@@ -9,8 +12,19 @@ from app.commands import (
     undeploy_awning,
     undeploy_for_seconds,
 )
+from app.display import start_display
 
-app = FastAPI(title="Tahoma Awning API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        start_display()
+    except Exception:
+        logging.exception("LCD display failed to start; continuing without it")
+    yield
+
+
+app = FastAPI(title="Tahoma Awning API", lifespan=lifespan)
 
 
 @app.get("/health")

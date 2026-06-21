@@ -1,0 +1,14 @@
+services:
+  tahoma-service:
+    container_name: tahoma-service
+    build: .
+    ports:
+      - "${AWNING_PORT:-8765}:8765"
+    env_file: .env
+    restart: unless-stopped
+    # LCD status display (optional, see README-LCD.md): pass the I2C bus
+    # into the container. Requires I2C enabled on the host (see README-LCD.md);
+    # the app degrades gracefully if the device node is missing or no LCD
+    # is attached.
+    devices:
+      - "/dev/i2c-1:/dev/i2c-1"
