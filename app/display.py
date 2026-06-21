@@ -8,7 +8,7 @@ normally — every hardware path is guarded and never raises into the caller.
 
 Fixed 16x2 layout::
 
-    STATUS: DEPLOYED     line 1: "STATUS: " + tracked position
+    FULLY DEPLOYED       line 1: last movement command executed (stop doesn't count)
     DEPLOYING 12S        line 2: current action (IDLE / DEPLOYING Ns / RETRACTING Ns)
 """
 
@@ -50,7 +50,7 @@ def _pad(line: str) -> str:
 
 def format_lines(status: dict) -> Tuple[str, str]:
     """Build the two LCD rows from current state. Pure; no hardware access."""
-    line1 = _pad(f"STATUS: {status['position']}")
+    line1 = _pad(status["last_movement"])
 
     action = status["action"]
     if action == "IDLE":
