@@ -14,36 +14,84 @@ _last_movement: str = "INITIAL STATE"  # e.g. "FULLY DEPLOYED", "DEPLOYED 2s"; s
 _action: str = "IDLE"  # IDLE, DEPLOYING, RETRACTING
 _action_started_at: Optional[float] = None
 _action_total_seconds: Optional[float] = None  # None when duration is unknown
-_epoch: int = 0  # bumped on every start_action; lets stale auto-settles no-op
+_action_start_position: Optional[float] = None  # _position_seconds when the action began
+_epoch: int = 0  # bumped on every start_action/end_action; lets stale auto-settles no-op
+_position_seconds: Optional[float] = None  # current deployed distance, 0..travel; None = unknown
+
+
+def format_seconds(seconds: float) -> str:
+    return f"{int(seconds)}s" if seconds == int(seconds) else f"{seconds:g}s"
 
 
 def start_action(action: str, total_seconds: Optional[float] = None) -> int:
     """Begin tracking an action. Returns an epoch token for end_action()."""
-    global _action, _action_started_at, _action_total_seconds, _epoch
+    global _action, _action_started_at, _action_total_seconds, _action_start_position, _epoch
     with _lock:
         _action = action
         _action_started_at = time.monotonic()
         _action_total_seconds = total_seconds
+        _action_start_position = _position_seconds
         _epoch += 1
         return _epoch
 
 
-def end_action(movement: Optional[str] = None, epoch: Optional[int] = None) -> None:
+def end_action(movement: Optional[str] = None, epoch: Optional[int] = None) -> bool:
     """Mark the action finished. If epoch is given and stale, this is a no-op.
 
     `movement` records what just happened (e.g. "FULLY DEPLOYED") for line 1 of
     the LCD. Pass None for non-movement stops (e.g. an explicit /awning/stop)
     so the last recorded movement stays on screen.
+
+    Returns True if applied, False if the epoch was stale (e.g. a stop already
+    ended this action before a scheduled auto-settle fired) — callers use this
+    to decide whether it's still safe to also set the position.
     """
-    global _action, _action_started_at, _action_total_seconds, _last_movement, _epoch
+    global _action, _action_started_at, _action_total_seconds, _action_start_position, _last_movement, _epoch
     with _lock:
         if epoch is not None and epoch != _epoch:
-            return
+            return False
         _action = "IDLE"
         _action_started_at = None
         _action_total_seconds = None
+        _action_start_position = None
         if movement is not None:
             _last_movement = movement
+        # Bump so a still-pending auto-settle captured under the old epoch
+        # (e.g. from a deploy that this end_action is stopping early) no-ops.
+        _epoch += 1
+        return True
+
+
+def get_action_info() -> dict:
+    """Raw action bookkeeping, for commands.py to compute position on an early stop."""
+    with _lock:
+        return {
+            "action": _action,
+            "started_at": _action_started_at,
+            "start_position": _action_start_position,
+        }
+
+
+def set_position(seconds: Optional[float]) -> None:
+    """Set current deployed distance in seconds (0 = fully retracted). None = unknown."""
+    global _position_seconds
+    with _lock:
+        _position_seconds = seconds
+
+
+def get_position() -> Optional[float]:
+    with _lock:
+        return _position_seconds
+
+
+def get_position_state() -> str:
+    """'unknown', 'retracted', or 'deployed Ns' describing current position."""
+    pos = get_position()
+    if pos is None:
+        return "unknown"
+    if pos <= 0:
+        return "retracted"
+    return f"deployed {format_seconds(pos)}"
 
 
 def get_status() -> dict:

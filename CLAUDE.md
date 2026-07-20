@@ -49,6 +49,7 @@ docker-compose.pi.yml   # Pi deploy target — adds /dev/i2c-1 passthrough for t
 | GET | `/awning/deploy/timed?seconds=` | Deploy then stop after N seconds |
 | GET | `/awning/undeploy/timed?seconds=` | Retract then stop after N seconds |
 | GET | `/awning/stop` | Stop movement immediately |
+| GET | `/awning/state` | Current position: `retracted`, `deployed Ns`, or `unknown`; waits for any in-progress move to settle first |
 | GET | `/awning/my` | Move to preset "my" position |
 | GET | `/awning/devices` | List all devices on the gateway |
 

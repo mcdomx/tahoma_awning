@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -13,6 +14,7 @@ from app.commands import (
     undeploy_for_seconds,
 )
 from app.display import start_display
+from app.state import get_position_state, get_status
 
 
 @asynccontextmanager
@@ -84,6 +86,18 @@ async def my() -> dict:
         return {"status": "ok"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/awning/state")
+async def state() -> dict:
+    """Current position: 'retracted', 'deployed Ns', or 'unknown'.
+
+    Waits for any in-progress move to finish before reporting, so the result
+    always reflects a settled position rather than a mid-travel estimate.
+    """
+    while get_status()["action"] != "IDLE":
+        await asyncio.sleep(0.5)
+    return {"state": get_position_state()}
 
 
 @app.get("/awning/devices")
