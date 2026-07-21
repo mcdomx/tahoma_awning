@@ -20,7 +20,7 @@ _position_seconds: Optional[float] = None  # current deployed distance, 0..trave
 
 
 def format_seconds(seconds: float) -> str:
-    return f"{int(seconds)}s" if seconds == int(seconds) else f"{seconds:g}s"
+    return f"{round(seconds)}s"
 
 
 def start_action(action: str, total_seconds: Optional[float] = None) -> int:
