@@ -37,15 +37,21 @@ async def undeploy_awning() -> None:
 
 
 async def stop_awning() -> None:
-    """Stop is not a movement: the last recorded movement stays on the LCD."""
+    """If stop interrupts an active deploy/undeploy, record it as a movement
+    (e.g. "DEPLOYED 2s") so the LCD matches /awning/state. A stop with no
+    active move (e.g. pressed while already IDLE) leaves the LCD unchanged.
+    """
     info = get_action_info()
+    movement = None
     if info["action"] in ("DEPLOYING", "RETRACTING") and info["started_at"] is not None:
         elapsed = time.monotonic() - info["started_at"]
         start_position = info["start_position"] if info["start_position"] is not None else 0.0
         delta = elapsed if info["action"] == "DEPLOYING" else -elapsed
         set_position(_clamp_position(start_position + delta))
+        verb = "DEPLOYED" if info["action"] == "DEPLOYING" else "RETRACTED"
+        movement = f"{verb} {format_seconds(elapsed)}"
     await _send_command("stop")
-    end_action()
+    end_action(movement)
 
 
 async def my_position() -> None:
