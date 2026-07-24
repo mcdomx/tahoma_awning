@@ -5,12 +5,13 @@ tracked optimistically from the commands this service has sent, not from
 the hardware. Used by app/display.py to render the LCD.
 """
 
+import os
 import threading
 import time
 from typing import Optional
 
 _lock = threading.Lock()
-_last_movement: str = "INITIAL STATE"  # e.g. "FULLY DEPLOYED", "DEPLOYED 2s"; stop is not a movement
+_last_movement: str = "None"  # e.g. "Deploy 25s", "Retract 2s"; stop-without-movement doesn't change this
 _action: str = "IDLE"  # IDLE, DEPLOYING, RETRACTING
 _action_started_at: Optional[float] = None
 _action_total_seconds: Optional[float] = None  # None when duration is unknown
@@ -21,6 +22,11 @@ _position_seconds: Optional[float] = None  # current deployed distance, 0..trave
 
 def format_seconds(seconds: float) -> str:
     return f"{round(seconds)}s"
+
+
+def travel_seconds() -> float:
+    """Configured full deploy/undeploy travel time in seconds (AWNING_TRAVEL_SECONDS)."""
+    return float(os.getenv("AWNING_TRAVEL_SECONDS", "25"))
 
 
 def start_action(action: str, total_seconds: Optional[float] = None) -> int:
@@ -95,14 +101,25 @@ def get_position_state() -> str:
 
 
 def get_status() -> dict:
-    """Return last movement/action, resolving any timed countdown live."""
+    """Return last movement/action, resolving elapsed time live while moving."""
     with _lock:
-        action, started_at, total = _action, _action_started_at, _action_total_seconds
+        action, started_at = _action, _action_started_at
         last_movement = _last_movement
 
     if action == "IDLE" or started_at is None:
-        return {"last_movement": last_movement, "action": "IDLE", "remaining_seconds": None}
+        return {"last_movement": last_movement, "action": "IDLE", "elapsed_seconds": None}
 
-    elapsed = time.monotonic() - started_at
-    remaining = max(0, round(total - elapsed)) if total is not None else None
-    return {"last_movement": last_movement, "action": action, "remaining_seconds": remaining}
+    elapsed = round(time.monotonic() - started_at)
+    return {"last_movement": last_movement, "action": action, "elapsed_seconds": elapsed}
+
+
+def get_net_line_state() -> str:
+    """'Retracted', 'Max Deploy', 'Deployed Ns', or 'Unknown' for the LCD NET line."""
+    pos = get_position()
+    if pos is None:
+        return "Unknown"
+    if pos <= 0:
+        return "Retracted"
+    if pos >= travel_seconds():
+        return "Max Deploy"
+    return f"Deployed {format_seconds(pos)}"

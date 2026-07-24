@@ -13,8 +13,9 @@ API normally. You can wire it up at any time.
 A fixed 16x2 layout, refreshing every second:
 
 ```
-FULLY DEPLOYED       <- last movement command executed
-DEPLOYING 12S        <- current action: IDLE, DEPLOYING <n>S, or RETRACTING <n>S
+LAST:Deploy 25s       <- last completed movement (idle), or "Deploying <n>s" /
+NET:Deployed 8s          "Retracting <n>s" while actively moving (line 1)
+                      <- net deployed position (line 2)
 ```
 
 The RTS awning motor has **no position feedback** — there's no sensor telling
@@ -22,20 +23,17 @@ the gateway (or this service) where the awning physically is. So both lines
 are tracked optimistically from the commands this service has sent, not read
 from hardware:
 
-- **Last movement** (line 1) is set when a movement completes: a full
-  `deploy` → `FULLY DEPLOYED`, a full `undeploy` → `FULLY RETRACTED`, a timed
-  `deploy`/`undeploy` → `DEPLOYED <n>s` / `RETRACTED <n>s`. `stop` and `my` are
-  not movements, so they leave this line unchanged. Before any command has
-  been sent this boot, it reads `INITIAL STATE`.
-- **Action** (line 2) shows `IDLE` when nothing is moving. For a timed
-  `/awning/deploy/timed` or `/awning/undeploy/timed` call, the countdown
-  counts down the requested seconds. For a full (non-timed) `/awning/deploy`
-  or `/awning/undeploy` call — where the motor runs until it hits its
-  end-of-travel limit switch — the countdown instead counts down
-  `AWNING_TRAVEL_SECONDS`, an estimate of how long a full traverse takes, then
-  automatically reverts to `IDLE` and updates the status line. If you send a
-  `stop` before that estimate elapses, the display updates immediately and the
-  stale countdown is discarded.
+- **Line 1** shows the last completed movement while idle, e.g. `LAST:Deploy
+  25s` or `LAST:Retract 4s` (the duration is however long that movement
+  actually ran — the full travel time for an uninterrupted deploy/undeploy, or
+  the elapsed time if it was stopped early or timed). `stop`-without-movement
+  and `my` don't change this line. Before any command has been sent this boot,
+  it reads `LAST:None`. While a movement is in progress, line 1 instead shows
+  `Deploying <n>s` or `Retracting <n>s`, counting up elapsed seconds.
+- **Line 2** shows the current net deployed position: `NET:Retracted` (fully
+  retracted), `NET:Max Deploy` (fully deployed), or `NET:Deployed <n>s` for
+  anything in between. This is derived from the same optimistic position
+  tracking used by `/awning/state`.
 
 ## 1. Wiring
 
@@ -126,7 +124,7 @@ Set `LCD_ENABLED=false` to force it off even when an LCD is attached.
 - **Container can't open `/dev/i2c-1`** — confirm you deployed with
   `docker-compose.pi.yml` (not the plain `docker-compose.yml`), and that
   `/dev/i2c-1` exists on the host (`ls /dev/i2c-1`).
-- **Last movement/action never change from `INITIAL STATE`/`IDLE`** — the LCD only reflects
+- **Last movement/action never change from `LAST:None`/`IDLE`** — the LCD only reflects
   commands sent through this service; it has no way to see manual remote
   control of the awning.
 - **Confirm graceful operation** — unplug the LCD and restart the service; the

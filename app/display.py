@@ -8,8 +8,8 @@ normally — every hardware path is guarded and never raises into the caller.
 
 Fixed 16x2 layout::
 
-    FULLY DEPLOYED       line 1: last movement command executed (stop doesn't count)
-    DEPLOYING 12S        line 2: current action (IDLE / DEPLOYING Ns / RETRACTING Ns)
+    LAST:Deploy 25s      line 1: last completed movement (idle) or in-progress
+    NET:Deployed 4s      action with elapsed seconds (moving); line 2: net position
 """
 
 import logging
@@ -18,7 +18,7 @@ import threading
 import time
 from typing import Tuple
 
-from app.state import get_status
+from app.state import get_net_line_state, get_status
 
 try:
     from RPLCD.i2c import CharLCD
@@ -50,16 +50,15 @@ def _pad(line: str) -> str:
 
 def format_lines(status: dict) -> Tuple[str, str]:
     """Build the two LCD rows from current state. Pure; no hardware access."""
-    line1 = _pad(status["last_movement"])
-
     action = status["action"]
     if action == "IDLE":
-        line2 = "IDLE"
-    elif status["remaining_seconds"] is not None:
-        line2 = f"{action} {status['remaining_seconds']}S"
+        line1 = f"LAST:{status['last_movement']}"
     else:
-        line2 = action
-    return line1, _pad(line2)
+        verb = "Deploying" if action == "DEPLOYING" else "Retracting"
+        line1 = f"{verb} {status['elapsed_seconds']}s"
+
+    line2 = f"NET:{get_net_line_state()}"
+    return _pad(line1), _pad(line2)
 
 
 def _init_lcd():
